@@ -4,17 +4,20 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import os
-from torchvision.datasets import MNIST
+from torchvision.datasets import MNIST, CIFAR10
 from sklearn.metrics import accuracy_score
 
 from model import LogRegClassifier, ConvClassifier
-from transforms import to_tensor, show_errors
+from transforms import to_tensor, show_errors, show_fc_params, show_conv_params
 
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(torch.cuda.get_device_name(0))
 
 def evaluate(dataloader, size, model):
     preds, true = np.zeros((size,), dtype=np.uint8), np.zeros((size,), dtype=np.uint8)
     for step, (x, y) in enumerate(dataloader):
-        logits = model(x)
+        logits = model(x.to(device))
         _, pred = logits.max(1)
         pred = pred.byte().cpu().numpy()
         t = y.byte().cpu().numpy()
@@ -23,21 +26,25 @@ def evaluate(dataloader, size, model):
     return accuracy_score(true, preds), true, preds
 
 
-mnist_train = MNIST(os.getcwd(), train=True, transform=to_tensor, download=True)
-mnist_test = MNIST(os.getcwd(), train=False, transform=to_tensor, download=True)
+# mnist_train = MNIST(os.getcwd(), train=True, transform=to_tensor, download=True)
+# mnist_test = MNIST(os.getcwd(), train=False, transform=to_tensor, download=True)
+
+cifar_train = CIFAR10(os.getcwd(), download=True, transform=to_tensor, train=True)
+cifar_test = CIFAR10(os.getcwd(), download=True, transform=to_tensor, train=False)
 
 # model instantiation
-# model = LogRegClassifier(28 ** 2, 10)
-model = ConvClassifier()
+# model = LogRegClassifier(28 ** 2, 10).to(device)
+model = ConvClassifier(in_channels=3, num_classes=10, input_size=(32, 32)).to(device)
 
 # training loss and optimizer
-# optimizer = optim.SGD(model.parameters(), lr=1e-3)
+# optimizer = optim.SGD(model.parameters(), lr=1e-1)
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 criterion = nn.CrossEntropyLoss()
 
 # data batching
-dataloader_train = DataLoader(mnist_train, batch_size=16, shuffle=True, num_workers=2, pin_memory=True, drop_last=True)
-dataloader_test = DataLoader(mnist_test, batch_size=16)
+batch_size = 256
+dataloader_train = DataLoader(cifar_train, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
+dataloader_test = DataLoader(cifar_test, batch_size=batch_size)
 
 
 class Trainer(object):
@@ -61,12 +68,13 @@ class Trainer(object):
         for e in range(self.epochs):
             steps = len(dataloader_train)
             for step, (x, y) in enumerate(self.loader_train):
+                x, y = x.to(device), y.to(device)
                 logits = self.model(x)
                 loss = self.criterion(logits, y)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                if step % 1000 == 0:
+                if step % 100 == 0:
                     print(f'Epoch {e+1}/{self.epochs} step {step}/{steps} loss: {loss.cpu().item():.2f}')
             acc_train, true_train, preds_train = evaluate(self.loader_train, self.num_train, self.model)
             acc_test, true_test, preds_test = evaluate(self.loader_test, self.num_test, self.model)
@@ -74,9 +82,11 @@ class Trainer(object):
             print(f'Accuracy test: {100 * acc_test:.2f}%')
         return true_test, preds_test
 
-
+# show_fc_params(model.W)
 # train loop
-with Trainer(dataloader_train, dataloader_test, model, criterion, optimizer, epochs=2) as trainer:
+with Trainer(dataloader_train, dataloader_test, model, criterion, optimizer, epochs=15) as trainer:
     true_test, preds_test = trainer.train()
 
-show_errors(mnist_test, true_test, preds_test)
+# show_errors(mnist_test, true_test, preds_test)
+# show_fc_params(model.W)
+show_conv_params(model.model[0].weight)
