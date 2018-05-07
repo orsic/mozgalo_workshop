@@ -12,6 +12,11 @@ def random_flip(image: pimg):
 
 
 def to_tensor(image):
+    '''
+    Convert Numpy array to Torch tensor
+    :param image: 2D/3D ndarray
+    :return: Tensor (C, H, W)
+    '''
     x = np.float32(image)
     x /= 255
     if len(x.shape) == 2:
@@ -22,6 +27,13 @@ def to_tensor(image):
 
 
 def show_batch(batch, preds=None, class_def=None):
+    '''
+    Show a batch of images and optional predictions w. or w.o. class names
+    :param batch: tuple of (imgs, labels) batch
+    :param preds: iterable of predictions for each image in batch
+    :param class_def: iterable of class names
+    :return:
+    '''
     imgs, labels = batch
     N, C, H, W = imgs.shape
     r, c = [int(math.ceil(math.sqrt(N)))] * 2
@@ -40,6 +52,14 @@ def show_batch(batch, preds=None, class_def=None):
 
 
 def show_errors(dataset, true, pred, class_def=None):
+    '''
+    Show misclassified examples
+    :param dataset: data container for (image, label) tuples
+    :param true: 1D ndarray of GT labels
+    :param pred: 1D ndarray of predicted classes
+    :param class_def: iterable of class names
+    :return:
+    '''
     missedd_indices = np.where(pred != true)[0][:16]
     missed_img = torch.stack([dataset[i][0] for i in missedd_indices])
     missed_lab, missed_pred = true[missedd_indices], pred[missedd_indices]
@@ -47,6 +67,12 @@ def show_errors(dataset, true, pred, class_def=None):
 
 
 def show_fc_params(params, size=(28, 28)):
+    '''
+    Show fully connected layer parameters slice by slice
+    :param params: torch.nn.Parameter
+    :param size:
+    :return:
+    '''
     W = np.copy(params.data.cpu().numpy().transpose())
     r, c = [int(math.ceil(math.sqrt(W.shape[0])))] * 2
     for i, w in enumerate(W):
@@ -58,6 +84,11 @@ def show_fc_params(params, size=(28, 28)):
 
 
 def show_conv_params(params):
+    '''
+    Show convolutional layer parameters channel by channel
+    :param params: torch.nn.Parameter
+    :return:
+    '''
     W = np.copy(params.data.cpu().numpy())
     r, c = [int(math.ceil(math.sqrt(W.shape[0])))] * 2
     for i, w in enumerate(W):
